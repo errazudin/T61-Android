@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_play"
+        android:title="@string/menu_play"
+        android:icon="@drawable/ic_action_play"
+        android:orderInCategory="0"
+        android:showAsAction="always" />
+    <item android:id="@+id/menu_prev"
+        android:title="@string/menu_prev"
+        android:icon="@drawable/ic_action_prev"
+        android:orderInCategory="1"
+        android:showAsAction="always" />
+    <item android:id="@+id/menu_next"
+        android:title="@string/menu_next"
+        android:icon="@drawable/ic_action_next"
+        android:orderInCategory="2"
+        android:showAsAction="always" />
+</menu>
