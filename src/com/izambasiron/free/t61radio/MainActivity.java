@@ -3,8 +3,8 @@ package com.izambasiron.free.t61radio;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
@@ -17,7 +17,9 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup.LayoutParams;
 import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 
@@ -26,9 +28,11 @@ import com.example.android.actionbarcompat.ActionBarActivity;
 public class MainActivity extends ActionBarActivity implements OnClickListener {
     private static final String TAG = "com.izambasiron.free.t61radio.MainActivity";
     WebView mWebView;
-	private WakeLock mWake;
+    // TODO: handle device sleep based on pref
+	//private WakeLock mWake;
 	private GestureDetector mGestureDetector;
 	private OnTouchListener mGestureListener;
+	private PhoneStateListener mPhoneStateListener;
 	private static int SWIPE_MIN_DISTANCE;
     private static int SWIPE_THRESHOLD_VELOCITY;
 
@@ -36,13 +40,71 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         
-        final ViewConfiguration vc = ViewConfiguration.get(this);
+        final ViewConfiguration vc = ViewConfiguration.get(getApplication());
         
         SWIPE_MIN_DISTANCE = vc.getScaledTouchSlop();
         SWIPE_THRESHOLD_VELOCITY = vc.getScaledMinimumFlingVelocity();;
 
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
+        // TODO: handle device sleep based on pref
+        //PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        //mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
+        
+        // Set the webview url
+        if (mWebView == null) {
+            // Using 'this' instead of getApplication because getting 'FlashPaintSurface is RGB_565 (not OpenGL)'
+            // coming back from another application.
+        	mWebView = new WebView(this);
+        	mWebView.setId(2207);
+        	mWebView.getSettings().setPluginState(WebSettings.PluginState.ON);
+        	mWebView.getSettings().setJavaScriptEnabled(true);
+        	mWebView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
+        	mWebView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+        	mWebView.setWebChromeClient(new WebChromeClient() {
+        		@Override
+        		public void onReceivedTitle(android.webkit.WebView view, java.lang.String title) {
+        			super.onReceivedTitle(view, title);
+        			Log.d(TAG, "Title: " + title);
+        			setTitle(title);
+        		}
+        	});
+        	
+        	mWebView.loadUrl("http://www.thesixtyone.com/");
+        	
+        	FrameLayout layout = (FrameLayout)findViewById(R.id.main);
+        	layout.addView(mWebView);
+        }
+        
+        // Gesture detection
+        mGestureDetector = new GestureDetector(new MyGestureDetector());
+        mGestureListener = new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                return mGestureDetector.onTouchEvent(event);
+            }
+        };
+        
+        mWebView.setOnClickListener(this); 
+        mWebView.setOnTouchListener(mGestureListener);
+        
+        mPhoneStateListener = new PhoneStateListener() {
+            @Override
+            public void onCallStateChanged(int state, String incomingNumber) {
+                if (state == TelephonyManager.CALL_STATE_RINGING) {
+                    //Incoming call: Pause music
+                	mWebView.loadUrl("javascript:t61.miniplayer.pause()");
+                } else if(state == TelephonyManager.CALL_STATE_IDLE) {
+                    //Not in call: Play music
+                	mWebView.loadUrl("javascript:t61.miniplayer.play()");
+                } else if(state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                    //A call is dialing, active or on hold
+                	mWebView.loadUrl("javascript:t61.miniplayer.pause()");
+                }
+                super.onCallStateChanged(state, incomingNumber);
+            }
+        };
+        TelephonyManager mgr = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+        if(mgr != null) {
+            mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+        }
     }
     
     class MyGestureDetector extends SimpleOnGestureListener {
@@ -64,50 +126,31 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
     }
     
     @Override
+    protected void onDestroy() {
+    	super.onDestroy();
+    	TelephonyManager mgr = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+    	if(mgr != null) {
+    	    mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+    	}
+    	mWebView.getSettings().setPluginState(WebSettings.PluginState.OFF);
+    	mWebView.destroy();
+  	    mWebView = null;
+    }
+    
+    @Override
     protected void onPause() {
        super.onPause();
      
-       // Destroy Flash along with it so it will not start 2 instance of Flash when this resumes
-       mWebView.destroy();
- 	   mWebView = null;
- 	   mWake.release();
+       // TODO: handle device sleep based on pref
+ 	   //mWake.release();
     }
 
     @Override
     protected void onResume() {
      super.onResume();
-     // Set the webview url
-     if (mWebView == null) {
-     	mWebView = new WebView(this);
-     	mWebView.getSettings().setPluginsEnabled(true);
-     	mWebView.getSettings().setJavaScriptEnabled(true);
-     	mWebView.setWebChromeClient(new WebChromeClient() {
-     		@Override
-     		public void onReceivedTitle(android.webkit.WebView view, java.lang.String title) {
-     			super.onReceivedTitle(view, title);
-     			Log.d(TAG, "Title: " + title);
-     			setTitle(title);
-     		}
-     	});
-     	
-     	mWebView.loadUrl("http://www.thesixtyone.com/");
-     	
-     	FrameLayout layout = (FrameLayout)findViewById(R.id.main);
-     	layout.addView(mWebView);
-     }
      
-     // Gesture detection
-     mGestureDetector = new GestureDetector(new MyGestureDetector());
-     mGestureListener = new View.OnTouchListener() {
-         public boolean onTouch(View v, MotionEvent event) {
-             return mGestureDetector.onTouchEvent(event);
-         }
-     };
-     
-     mWebView.setOnClickListener(this); 
-     mWebView.setOnTouchListener(mGestureListener);
-     
-     mWake.acquire();
+     // TODO: handle device sleep based on pref
+     //mWake.acquire();
     }
 
     @Override
@@ -147,7 +190,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
             	} else {
             		pref = MyPreferenceFragment.class;
             	}
-            	Intent prefIntent = new Intent(this, pref);
+            	Intent prefIntent = new Intent(getApplication(), pref);
                 startActivity(prefIntent);
             	break;
         }
