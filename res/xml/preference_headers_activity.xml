@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:key="first_preferencescreen">
+    <CheckBoxPreference
+            android:key="test_key1"
+            android:title="Test preference 1" />
+    <PreferenceScreen
+            android:key="second_preferencescreen"
+            android:title="First item">
+        <CheckBoxPreference
+                android:key="test_sub_key_1"
+                android:title="Test preference 2" 
+                />
+    </PreferenceScreen>
+</PreferenceScreen>

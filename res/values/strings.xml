@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">T61Radio</string>
+    <string name="app_settings">T61Radio Settings</string>
     <string name="menu_play">Play</string>
     <string name="menu_prev">Previous</string>
     <string name="menu_next">Next</string>
+    <string name="menu_settings">Settings</string>
 </resources>

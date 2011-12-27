@@ -1,5 +1,7 @@
 package com.izambasiron.free.t61radio;
 
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
@@ -54,7 +56,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
                 	mWebView.loadUrl("javascript:t61.playlist.play_previous_song()");
                 }
             } catch (Exception e) {
-                // nothing
+                Log.e(TAG, e.getMessage());
             }
             return false;
         }
@@ -63,12 +65,12 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
     
     @Override
     protected void onPause() {
-     super.onPause();
+       super.onPause();
      
-     // Destroy Flash along with it so it will not start 2 instance of Flash when this resumes
-     mWebView.destroy();
- 	 mWebView = null;
-     mWake.release();
+       // Destroy Flash along with it so it will not start 2 instance of Flash when this resumes
+       mWebView.destroy();
+ 	   mWebView = null;
+ 	   mWake.release();
     }
 
     @Override
@@ -122,7 +124,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
-                //Toast.makeText(this, "Tapped home", Toast.LENGTH_SHORT).show();
             	mWebView.loadUrl("javascript:t61.hearts.heart_current_song()");
                 break;
 
@@ -138,12 +139,22 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
             	mWebView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE));
                 mWebView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE));
                 break;
+                
+            case R.id.settings:
+            	Class<?> pref = null;
+            	if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+	            	pref = MyPreferenceActivity.class;
+            	} else {
+            		pref = MyPreferenceFragment.class;
+            	}
+            	Intent prefIntent = new Intent(this, pref);
+                startActivity(prefIntent);
+            	break;
         }
         return super.onOptionsItemSelected(item);
     }
 
 	@Override
 	public void onClick(View v) {
-		// TODO Auto-generated method stub
 	}
 }

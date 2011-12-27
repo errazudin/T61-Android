@@ -15,4 +15,8 @@
         android:icon="@drawable/ic_action_next"
         android:orderInCategory="2"
         android:showAsAction="always" />
+    <item android:id="@+id/settings"
+        android:title="@string/menu_settings"
+        android:orderInCategory="3"
+        android:showAsAction="never" />
 </menu>
