@@ -1,8 +1,15 @@
 package com.izambasiron.free.t61radio;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -18,23 +25,32 @@ import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup.LayoutParams;
+import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 
 import com.example.android.actionbarcompat.ActionBarActivity;
+import com.izambasiron.free.t61radio.MainActivity.BroadcastsHandler;
 
 public class MainActivity extends ActionBarActivity implements OnClickListener {
     private static final String TAG = "com.izambasiron.free.t61radio.MainActivity";
     WebView mWebView;
     // TODO: handle device sleep based on pref
-	//private WakeLock mWake;
+	private WakeLock mWake;
 	private GestureDetector mGestureDetector;
 	private OnTouchListener mGestureListener;
 	private PhoneStateListener mPhoneStateListener;
 	private static int SWIPE_MIN_DISTANCE;
     private static int SWIPE_THRESHOLD_VELOCITY;
+    
+    private NotificationManager mNotificationManager;
+	private Notification mNotification;
+	private BroadcastsHandler mBroadcastsHandler;
+    private static final int WEBVIEW_ID = 1;
+    private static final int NOTIFICATION_ID = 2;
+    private Boolean isHeadPhonesIn = false;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -46,15 +62,16 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
         SWIPE_THRESHOLD_VELOCITY = vc.getScaledMinimumFlingVelocity();;
 
         // TODO: handle device sleep based on pref
-        //PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        //mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
         
+        FrameLayout layout = (FrameLayout)findViewById(R.id.main);
         // Set the webview url
         if (mWebView == null) {
             // Using 'this' instead of getApplication because getting 'FlashPaintSurface is RGB_565 (not OpenGL)'
             // coming back from another application.
         	mWebView = new WebView(this);
-        	mWebView.setId(2207);
+        	mWebView.setId(WEBVIEW_ID);
         	mWebView.getSettings().setPluginState(WebSettings.PluginState.ON);
         	mWebView.getSettings().setJavaScriptEnabled(true);
         	mWebView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
@@ -63,15 +80,19 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
         		@Override
         		public void onReceivedTitle(android.webkit.WebView view, java.lang.String title) {
         			super.onReceivedTitle(view, title);
-        			Log.d(TAG, "Title: " + title);
         			setTitle(title);
+        			
+        			showNotification(title);
         		}
         	});
         	
         	mWebView.loadUrl("http://www.thesixtyone.com/");
         	
-        	FrameLayout layout = (FrameLayout)findViewById(R.id.main);
+        	
         	layout.addView(mWebView);
+        	
+        	if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB)
+        		layout.getRootView().setSystemUiVisibility(View.STATUS_BAR_HIDDEN);
         }
         
         // Gesture detection
@@ -105,9 +126,62 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
         if(mgr != null) {
             mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
         }
+        
+        // Prevent phone from being locked. Lockscreen kills the activity.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        
+        // Show notification
+        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        
+        int icon = R.drawable.ic_action_play;
+        CharSequence tickerText = getResources().getString(R.string.app_name);
+        long when = System.currentTimeMillis();
+
+        mNotification = new Notification(icon, tickerText, when);
+        
+        // 
+        mBroadcastsHandler = new BroadcastsHandler();
+        registerReceiver(mBroadcastsHandler, new android.content.IntentFilter(Intent.ACTION_HEADSET_PLUG));
     }
     
-    class MyGestureDetector extends SimpleOnGestureListener {
+    
+    protected void showNotification(String title) {
+    	 Context context = getApplicationContext();
+         CharSequence contentTitle = getResources().getString(R.string.app_name);
+         CharSequence contentText = title;
+         Intent notificationIntent = new Intent(this, MainActivity.class);
+         notificationIntent.setAction(Intent.ACTION_MAIN);
+         notificationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+         //notificationIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+         mNotification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
+         mNotificationManager.notify(NOTIFICATION_ID, mNotification);
+		
+	}
+    
+    class BroadcastsHandler extends BroadcastReceiver {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			// TODO Auto-generated method stub
+			if (intent.getAction().equalsIgnoreCase(Intent.ACTION_HEADSET_PLUG)) {
+		        int state = intent.getIntExtra("state", -1);
+		        if (state == 1) {
+		        	isHeadPhonesIn = true;
+		        } else {
+		        	if (isHeadPhonesIn) {
+		        		mWebView.loadUrl("javascript:t61.miniplayer.pause()");
+		        	}
+		        	isHeadPhonesIn = false;
+		        }
+		        Log.d(TAG, "HEADPHONES:" + state);
+			}
+		}
+    	
+    }
+
+	class MyGestureDetector extends SimpleOnGestureListener {
         @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
             try {
@@ -135,6 +209,10 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
     	mWebView.getSettings().setPluginState(WebSettings.PluginState.OFF);
     	mWebView.destroy();
   	    mWebView = null;
+  	    
+  	    mNotificationManager.cancel(NOTIFICATION_ID);
+  	    
+  	    unregisterReceiver(mBroadcastsHandler);
     }
     
     @Override
@@ -142,7 +220,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
        super.onPause();
      
        // TODO: handle device sleep based on pref
- 	   //mWake.release();
+ 	   mWake.release();
     }
 
     @Override
@@ -150,7 +228,8 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
      super.onResume();
      
      // TODO: handle device sleep based on pref
-     //mWake.acquire();
+     mWake.acquire();
+     getWindow().closeAllPanels();
     }
 
     @Override
@@ -195,6 +274,18 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
             	break;
         }
         return super.onOptionsItemSelected(item);
+    }
+    
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_POWER) {
+        	WindowManager.LayoutParams lp = getWindow().getAttributes();
+        	lp.screenBrightness = 0.01f;
+        	getWindow().setAttributes(lp);
+            return true;
+        }
+
+        return super.dispatchKeyEvent(event);
     }
 
 	@Override
