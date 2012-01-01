@@ -118,6 +118,8 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		long when = System.currentTimeMillis();
 
 		mNotification = new Notification(icon, tickerText, when);
+		mNotification.flags |= Notification.FLAG_ONGOING_EVENT;
+		mNotification.flags |= Notification.FLAG_ONLY_ALERT_ONCE;
 
 		// listen to headset plug in/out
 		mBroadcastsHandler = new BroadcastsHandler();
@@ -142,11 +144,11 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		Context context = getApplicationContext();
 		CharSequence contentTitle = getResources().getString(R.string.app_name);
 		CharSequence contentText = title;
-		Intent notificationIntent = new Intent(this, MainActivity.class);
+		Intent notificationIntent = new Intent(context, MainActivity.class);
 		notificationIntent.setAction(Intent.ACTION_MAIN);
 		notificationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 		//notificationIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+		PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
 
 		mNotification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
 		mNotificationManager.notify(NOTIFICATION_ID, mNotification);
