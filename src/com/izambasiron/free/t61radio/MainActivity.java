@@ -1,12 +1,16 @@
 package com.izambasiron.free.t61radio;
 
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.IntentFilter;
+import android.net.TrafficStats;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -17,6 +21,7 @@ import android.util.Log;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -25,46 +30,57 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
+import android.webkit.WebSettings.ZoomDensity;
 import android.webkit.WebView;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import com.example.android.actionbarcompat.ActionBarActivity;
 
 public class MainActivity extends ActionBarActivity implements OnClickListener {
-	private static final String TAG = "com.izambasiron.free.t61radio.MainActivity";
-	WebView mWebView;
+	private static final String TAG = "MainActivity";
+	private static int SWIPE_MIN_DISTANCE;
+	private static int SWIPE_THRESHOLD_VELOCITY;
+	private static final int WEBVIEW_ID = 1;
+	private static final int NOTIFICATION_ID = 2;
+	
+	
+	private WebView mWebView;
 	// TODO: handle device sleep based on pref
 	private WakeLock mWake;
 	private GestureDetector mGestureDetector;
 	private OnTouchListener mGestureListener;
 	private PhoneStateListener mPhoneStateListener;
-	private static int SWIPE_MIN_DISTANCE;
-	private static int SWIPE_THRESHOLD_VELOCITY;
-
 	private NotificationManager mNotificationManager;
 	private Notification mNotification;
 	private BroadcastsHandler mBroadcastsHandler;
-	private static final int WEBVIEW_ID = 1;
-	private static final int NOTIFICATION_ID = 2;
 	private Boolean isHeadPhonesIn = false;
+	private long mRxStart;
+	private BatteryDataDbAdapter mBatteryDataDbAdapter;
+	private BroadcastReceiver mBatteryReceiver;
+	
 
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 
-		final ViewConfiguration vc = ViewConfiguration.get(getApplication());
+		final ViewConfiguration vc = ViewConfiguration.get(getApplicationContext());
+		mBatteryDataDbAdapter = new BatteryDataDbAdapter(getApplicationContext());
+		mBatteryDataDbAdapter.open();
+		
 
 		SWIPE_MIN_DISTANCE = vc.getScaledTouchSlop();
-		SWIPE_THRESHOLD_VELOCITY = vc.getScaledMinimumFlingVelocity();;
+		SWIPE_THRESHOLD_VELOCITY = vc.getScaledMinimumFlingVelocity();
 
 		// TODO: handle device sleep based on pref
 		PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
 		mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
-
 
 		Intent intent = getIntent();
 		// check if this intent is started via url
@@ -74,7 +90,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			createWebView(null);
 		}
 		
-
 		// Gesture detection
 		mGestureDetector = new GestureDetector(new MyGestureDetector());
 		mGestureListener = new View.OnTouchListener() {
@@ -124,21 +139,69 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		// listen to headset plug in/out
 		mBroadcastsHandler = new BroadcastsHandler();
 		registerReceiver(mBroadcastsHandler, new android.content.IntentFilter(Intent.ACTION_HEADSET_PLUG));
+		
+		// Set data default values
+		mRxStart = TrafficStats.getTotalRxBytes();
+		
+		// Listen to battery & data usage
+		batteryAndDataUsage();
+		
+		// TODO: Not working
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+			getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+			Log.d(TAG, "LOW PROFILE");
+		}
 	}
 	
+	private void batteryAndDataUsage() {
+		// start monitoring. stop on destroy
+		mBatteryReceiver = new BroadcastReceiver() {
+	        int level = -1;
+	        @Override
+	        public void onReceive(Context context, Intent intent) {
+	            final Intent fIntent = intent;
+	            
+	            new Thread(new Runnable() {
+	                public void run() {
+	                	level = fIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+	                	long date = System.currentTimeMillis();
+	                	
+	    	            // get data 
+	    	            if (mRxStart != TrafficStats.UNSUPPORTED) {
+	    	            	long rx = TrafficStats.getTotalTxBytes();
+	    	            	
+	    	            	Log.d(TAG, "level:" + level + " bytes:" + rx + " date:" + date);
+	    	            	if (rx > mRxStart) {
+	    	            		mBatteryDataDbAdapter.insert(level, rx - mRxStart, date);
+	    	            		mRxStart = rx;
+	    	            	} else {
+	    	            		mBatteryDataDbAdapter.insert(level, 0, date);
+	    	            	}
+	    	            } else {
+	    	            	mBatteryDataDbAdapter.insert(level, 0, date);
+	    	            	Log.d(TAG, "level:" + level + " date:" + date);
+	    	            }
+	    	            
+	                }
+	              }).start();
+	        }
+	    };
+	    IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+	    registerReceiver(mBatteryReceiver, filter);
+	}
+
 	@Override
 	protected void onNewIntent(Intent intent) {
 		Log.d(TAG, intent.toString());
 		super.onNewIntent(intent);
 		
-		// check if this intent is started via custom scheme link
+		// check if this intent is started via a link to http://www.thesixtyone.com
 		if (Intent.ACTION_VIEW.equals(intent.getAction())) {
 			mWebView.destroy();
 			mWebView = null;
 			createWebView(intent.getData().toString());
 		} 
 	}
-
 
 	protected void showNotification(String title) {
 		Context context = getApplicationContext();
@@ -166,6 +229,10 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			mWebView.setId(WEBVIEW_ID);
 			mWebView.getSettings().setPluginState(WebSettings.PluginState.ON);
 			mWebView.getSettings().setJavaScriptEnabled(true);
+			mWebView.getSettings().setSupportZoom(true);
+			// Disabled to let fling gesture work
+			//mWebView.getSettings().setBuiltInZoomControls(true);
+			mWebView.getSettings().setDefaultZoom(ZoomDensity.FAR);
 			mWebView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
 			mWebView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
 			mWebView.setWebChromeClient(new WebChromeClient() {
@@ -179,10 +246,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			});
 
 			layout.addView(mWebView);
-
-			// TODO: Not working
-			if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB)
-				layout.getRootView().setSystemUiVisibility(View.STATUS_BAR_HIDDEN);
 		}
 		
 		if (webAddress != null && !webAddress.isEmpty())
@@ -227,7 +290,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			}
 			return false;
 		}
-
+		
 	}
 
 	@Override
@@ -244,6 +307,8 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		mNotificationManager.cancel(NOTIFICATION_ID);
 
 		unregisterReceiver(mBroadcastsHandler);
+		unregisterReceiver(mBatteryReceiver);
+		mBatteryDataDbAdapter.close();
 	}
 
 	@Override
@@ -296,11 +361,11 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		case R.id.settings:
 			Class<?> pref = null;
 			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-				pref = MyPreferenceActivity.class;
+				pref = T61RadioPreferenceActivity.class;
 			} else {
-				pref = MyPreferenceFragment.class;
+				pref = T61RadioPreferenceFragment.class;
 			}
-			Intent prefIntent = new Intent(getApplication(), pref);
+			Intent prefIntent = new Intent(getApplicationContext(), pref);
 			startActivity(prefIntent);
 			break;
 		}
@@ -314,9 +379,77 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			lp.screenBrightness = 0.01f;
 			getWindow().setAttributes(lp);
 			return true;
-		}
+		} else if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+			// Already using dispatch key event, so what the hell.
+			
+	        if (event.getAction() == KeyEvent.ACTION_DOWN
+	                && event.getRepeatCount() == 0) {
 
-		return super.dispatchKeyEvent(event);
+	            // Tell the framework to start tracking this event.
+	        	getWindow().getDecorView().getKeyDispatcherState().startTracking(event, this);
+	            return true;
+
+	        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+	        	getWindow().getDecorView().getKeyDispatcherState().handleUpEvent(event);
+	            if (event.isTracking() && !event.isCanceled()) {
+
+	                // DO BACK ACTION HERE
+	    			Boolean showAlerts = T61RadioSharedPreferences.getShowAlertFlag(getApplicationContext());
+	    			Boolean alertExit = T61RadioSharedPreferences.getAlertExitFlag(getApplicationContext());
+	    			if (showAlerts && alertExit) {
+	    				AlertDialog.Builder builder;
+	    				AlertDialog alertDialog;
+
+	    				Context mContext = this;
+	    				LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(LAYOUT_INFLATER_SERVICE);
+	    				View layout = inflater.inflate(R.layout.alert_dialog,
+	    				                               (ViewGroup) findViewById(R.id.layout_root));
+
+	    				TextView text = (TextView) layout.findViewById(R.id.text);
+	    				text.setText(getResources().getString(R.string.confirm_exit));
+	    				
+	    				final CheckBox checkBox = (CheckBox) layout.findViewById(R.id.check_box);
+
+	    				builder = new AlertDialog.Builder(mContext);
+	    				builder.setView(layout)
+	    				       .setCancelable(true)
+	    				       .setPositiveButton(getResources().getString(R.string.yes), 
+	    				    		   new DialogInterface.OnClickListener() {
+								
+									@Override
+									public void onClick(DialogInterface dialog, int which) {
+										if (!checkBox.isChecked()) {
+											T61RadioSharedPreferences.setAlertExitFlag(getApplicationContext(), 
+													false);
+										}
+										MainActivity.this.finish();
+									}
+								})
+							   .setNegativeButton(getResources().getString(R.string.no), 
+	    				    		   new DialogInterface.OnClickListener() {
+									
+									@Override
+									public void onClick(DialogInterface dialog, int which) {
+										if (!checkBox.isChecked()) {
+											T61RadioSharedPreferences.setAlertExitFlag(getApplicationContext(), 
+													false);
+										}
+										dialog.cancel();
+									}
+								});
+	    				alertDialog = builder.create();
+	    				alertDialog.show();
+	    				return true;
+	    			} else {
+	    				MainActivity.this.finish();
+	    				return true;
+	    			}
+	            }
+	        }
+	        return super.dispatchKeyEvent(event);
+	    } else {
+	        return super.dispatchKeyEvent(event);
+	    }
 	}
 
 	@Override

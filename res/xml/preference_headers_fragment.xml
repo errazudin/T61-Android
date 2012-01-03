@@ -1,23 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
 <preference-headers
         xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <header android:fragment="com.izambasiron.free.t61radio.MyPreferenceFragment$Prefs1Fragment"
-            android:title="Prefs 1"
-            android:summary="An example of some preferences." />
-            
-    <header android:fragment="com.izambasiron.free.t61radio.MyPreferenceFragment$Prefs2Fragment"
-            android:title="Prefs 2"
-            android:summary="Some other preferences you can see.">
-        <!-- Arbitrary key/value pairs can be included with a header as
-             arguments to its fragment. -->
-        <extra android:name="someKey" android:value="someHeaderValue" />
-    </header>
-
-    <header android:title="Intent"
-            android:summary="Launches an Intent.">
+    <header android:fragment="com.izambasiron.free.t61radio.T61RadioPreferenceFragment$BatteryDataUsagePreferenceFragment"
+            android:title="@string/pref_header_battery_data_usage"/>
+    <header android:fragment="com.izambasiron.free.t61radio.T61RadioPreferenceFragment$AlertDialogPreferenceFragment"
+            android:title="@string/pref_header_alert_dialogs"/>
+    <header android:title="Report a bug">
         <intent android:action="android.intent.action.VIEW"
-                android:data="http://www.android.com" />
+                android:data="https://github.com/izambasiron/T61-Android/issues" />
     </header>
-    
 </preference-headers>
 

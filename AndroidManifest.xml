@@ -26,9 +26,16 @@
 				<data android:host="www.thesixtyone.com" android:scheme="http"></data>
 			</intent-filter>
         </activity>
-        <activity android:name=".MyPreferenceActivity" android:label="@string/app_settings"></activity>
-		<activity android:name=".MyPreferenceFragment" android:label="@string/app_settings"
+        <activity android:name=".T61RadioPreferenceActivity" android:label="@string/app_settings"></activity>
+		<activity android:name=".T61RadioPreferenceFragment" android:label="@string/app_settings"
 		    android:theme="@style/AppTheme"></activity>
+		<activity android:name=".BatteryDataUsagePreferenceActivity" 
+		    android:label="@string/pref_header_battery_data_usage">
+		    <intent-filter>
+		     <action android:name="android.intent.action.VIEW" />
+		     <category android:name="android.intent.category.DEFAULT" />
+		    </intent-filter>
+		</activity>
     </application>
 
 </manifest>

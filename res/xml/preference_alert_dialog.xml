@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        >
-    <PreferenceScreen
-            android:title="@string/pref_header_battery_data_usage">
-        <intent android:action="android.intent.action.VIEW" 
-            android:targetPackage="com.izambasiron.free.t61radio" 
-            android:targetClass="com.izambasiron.free.t61radio.BatteryDataUsagePreferenceActivity" />
-    </PreferenceScreen>
-    <PreferenceScreen
-            android:title="@string/pref_header_alert_dialogs">
-        <CheckBoxPreference
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+    <CheckBoxPreference
                 android:key="@string/pref_key_show_alert"
                 android:title="@string/pref_title_show_alert"
                 android:summaryOn="@string/pref_summary_on_show_alert"
@@ -28,10 +18,4 @@
                 android:defaultValue="true"
                 />
         </PreferenceCategory>
-    </PreferenceScreen>
-    <PreferenceScreen
-            android:title="Report a bug">
-        <intent android:action="android.intent.action.VIEW"
-                android:data="https://github.com/izambasiron/T61-Android/issues" />
-    </PreferenceScreen>
 </PreferenceScreen>
