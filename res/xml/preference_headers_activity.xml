@@ -4,9 +4,9 @@
         >
     <PreferenceScreen
             android:title="@string/pref_header_battery_data_usage">
-        <intent android:action="android.intent.action.VIEW" 
-            android:targetPackage="com.izambasiron.free.t61radio" 
-            android:targetClass="com.izambasiron.free.t61radio.BatteryDataUsagePreferenceActivity" />
+        <CheckBoxPreference
+                android:title="Test preference 2" 
+                />
     </PreferenceScreen>
     <PreferenceScreen
             android:title="@string/pref_header_alert_dialogs">
@@ -19,6 +19,14 @@
                 />
         <PreferenceCategory 
             android:title="Dialogs">
+            <CheckBoxPreference
+                android:key="@string/pref_key_alert_data"
+                android:title="@string/pref_title_alert_data"
+                android:summaryOn="@string/pref_summary_on_alert_data"
+                android:summaryOff="@string/pref_summary_off_alert_data"
+                android:dependency="@string/pref_key_show_alert"
+                android:defaultValue="true"
+                />
             <CheckBoxPreference
                 android:key="@string/pref_key_alert_exit"
                 android:title="@string/pref_title_alert_exit"

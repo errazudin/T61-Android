@@ -13,12 +13,19 @@
     <string name="no">No</string>
     <string name="pref_key_show_alert">showAlert</string>
     <string name="pref_key_alert_exit">alertExit</string>
-    <string name="pref_header_battery_data_usage">Battery and Data Usage</string>
+    <string name="pref_header_battery_data_usage">Data Usage</string>
     <string name="pref_header_alert_dialogs">Alert Dialogs</string>
     <string name="pref_title_show_alert">Enable alert dialogs</string>
     <string name="pref_summary_on_show_alert">Uncheck to disable alert dialogs</string>
     <string name="pref_summary_off_show_alert">Check to enable alert dialogs</string>
-    <string name="pref_title_alert_exit">Warn before exiting application</string>
+    <string name="pref_title_alert_exit">Exiting application</string>
     <string name="pref_summary_on_alert_exit">Uncheck to disable exit alert dialog</string>
     <string name="pref_summary_off_alert_exit">Check to enable exit alert dialog</string>
+    <string name="ok">Ok</string>
+    <string name="quit">Quit</string>
+    <string name="confirm_using_data">This application will use your network data</string>
+    <string name="pref_key_alert_data">alertData</string>
+    <string name="pref_title_alert_data">Mobile network</string>
+    <string name="pref_summary_on_alert_data">Uncheck to start this application without getting mobile network alert</string>
+    <string name="pref_summary_off_alert_data">Check to get mobile network alert each time starting this application</string>
 </resources>

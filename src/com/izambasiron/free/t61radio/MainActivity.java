@@ -8,9 +8,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.net.TrafficStats;
-import android.os.BatteryManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -50,7 +49,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 	private static final int WEBVIEW_ID = 1;
 	private static final int NOTIFICATION_ID = 2;
 	
-	
 	private WebView mWebView;
 	// TODO: handle device sleep based on pref
 	private WakeLock mWake;
@@ -59,21 +57,14 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 	private PhoneStateListener mPhoneStateListener;
 	private NotificationManager mNotificationManager;
 	private Notification mNotification;
-	private BroadcastsHandler mBroadcastsHandler;
+	private BroadcastsHandler mBroadcastsHandler; // listen to headset plug in/out
 	private Boolean isHeadPhonesIn = false;
-	private long mRxStart;
-	private BatteryDataDbAdapter mBatteryDataDbAdapter;
-	private BroadcastReceiver mBatteryReceiver;
 	
-
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 
 		final ViewConfiguration vc = ViewConfiguration.get(getApplicationContext());
-		mBatteryDataDbAdapter = new BatteryDataDbAdapter(getApplicationContext());
-		mBatteryDataDbAdapter.open();
-		
 
 		SWIPE_MIN_DISTANCE = vc.getScaledTouchSlop();
 		SWIPE_THRESHOLD_VELOCITY = vc.getScaledMinimumFlingVelocity();
@@ -82,50 +73,72 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
 		mWake = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "DoNotDimScreen");
 
-		Intent intent = getIntent();
-		// check if this intent is started via url
-		if (Intent.ACTION_VIEW.equals(intent.getAction())) {
-			createWebView(intent.getData().toString());
+		// Warn before using mobile data
+		int online = isOnline();
+		final Context ctx = getApplicationContext();
+		if (T61RadioSharedPreferences.getShowAlertFlag(ctx) && T61RadioSharedPreferences.getAlertDataFlag(ctx)
+				&& online != -1 && online != ConnectivityManager.TYPE_WIFI) {
+			AlertDialog.Builder builder;
+			AlertDialog alertDialog;
+
+			LayoutInflater inflater = (LayoutInflater) this.getSystemService(LAYOUT_INFLATER_SERVICE);
+			View layout = inflater.inflate(R.layout.alert_dialog,
+			                               (ViewGroup) findViewById(R.id.layout_root));
+
+			TextView text = (TextView) layout.findViewById(R.id.text);
+			text.setText(getResources().getString(R.string.confirm_using_data));
+			
+			final CheckBox checkBox = (CheckBox) layout.findViewById(R.id.check_box);
+
+			builder = new AlertDialog.Builder(this);
+			builder.setView(layout)
+			       .setCancelable(false)
+			       .setPositiveButton(getResources().getString(R.string.ok), 
+			    		   new DialogInterface.OnClickListener() {
+					
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							if (!checkBox.isChecked()) {
+								T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
+							}
+							dialog.cancel();
+							Intent intent = getIntent();
+							// check if this intent is started via url
+							if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+								createWebView(intent.getData().toString());
+							} else {
+								createWebView(null);
+							}
+						}
+					})
+				   .setNegativeButton(getResources().getString(R.string.quit), 
+			    		   new DialogInterface.OnClickListener() {
+						
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							if (!checkBox.isChecked()) {
+								T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
+							}
+							MainActivity.this.finish();
+						}
+					});
+			alertDialog = builder.create();
+			alertDialog.show();
 		} else {
-			createWebView(null);
-		}
-		
-		// Gesture detection
-		mGestureDetector = new GestureDetector(new MyGestureDetector());
-		mGestureListener = new View.OnTouchListener() {
-			public boolean onTouch(View v, MotionEvent event) {
-				return mGestureDetector.onTouchEvent(event);
+			Intent intent = getIntent();
+			// check if this intent is started via url
+			if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+				createWebView(intent.getData().toString());
+			} else {
+				createWebView(null);
 			}
-		};
-
-		mWebView.setOnClickListener(this); 
-		mWebView.setOnTouchListener(mGestureListener);
-
-		mPhoneStateListener = new PhoneStateListener() {
-			@Override
-			public void onCallStateChanged(int state, String incomingNumber) {
-				if (state == TelephonyManager.CALL_STATE_RINGING) {
-					//Incoming call: Pause music
-					mWebView.loadUrl("javascript:t61.miniplayer.pause()");
-				} else if(state == TelephonyManager.CALL_STATE_IDLE) {
-					//Not in call: Play music
-					mWebView.loadUrl("javascript:t61.miniplayer.play()");
-				} else if(state == TelephonyManager.CALL_STATE_OFFHOOK) {
-					//A call is dialing, active or on hold
-					mWebView.loadUrl("javascript:t61.miniplayer.pause()");
-				}
-				super.onCallStateChanged(state, incomingNumber);
-			}
-		};
-		TelephonyManager mgr = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-		if(mgr != null) {
-			mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 		}
 
 		// Prevent phone from being locked. Lockscreen kills the activity.
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
 
 		// Show notification
+		// TODO: Show only on pause?
 		mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
 		int icon = R.drawable.ic_action_play;
@@ -140,12 +153,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		mBroadcastsHandler = new BroadcastsHandler();
 		registerReceiver(mBroadcastsHandler, new android.content.IntentFilter(Intent.ACTION_HEADSET_PLUG));
 		
-		// Set data default values
-		mRxStart = TrafficStats.getTotalRxBytes();
-		
-		// Listen to battery & data usage
-		batteryAndDataUsage();
-		
 		// TODO: Not working
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
 			getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
@@ -153,43 +160,27 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		}
 	}
 	
-	private void batteryAndDataUsage() {
-		// start monitoring. stop on destroy
-		mBatteryReceiver = new BroadcastReceiver() {
-	        int level = -1;
-	        @Override
-	        public void onReceive(Context context, Intent intent) {
-	            final Intent fIntent = intent;
-	            
-	            new Thread(new Runnable() {
-	                public void run() {
-	                	level = fIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-	                	long date = System.currentTimeMillis();
-	                	
-	    	            // get data 
-	    	            if (mRxStart != TrafficStats.UNSUPPORTED) {
-	    	            	long rx = TrafficStats.getTotalTxBytes();
-	    	            	
-	    	            	Log.d(TAG, "level:" + level + " bytes:" + rx + " date:" + date);
-	    	            	if (rx > mRxStart) {
-	    	            		mBatteryDataDbAdapter.insert(level, rx - mRxStart, date);
-	    	            		mRxStart = rx;
-	    	            	} else {
-	    	            		mBatteryDataDbAdapter.insert(level, 0, date);
-	    	            	}
-	    	            } else {
-	    	            	mBatteryDataDbAdapter.insert(level, 0, date);
-	    	            	Log.d(TAG, "level:" + level + " date:" + date);
-	    	            }
-	    	            
-	                }
-	              }).start();
-	        }
-	    };
-	    IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-	    registerReceiver(mBatteryReceiver, filter);
-	}
+	public int isOnline() {
+		int netType = -1;
+		try{
+			ConnectivityManager connectivityManager =  (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+			if(connectivityManager != null ){
+				NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
 
+				if(networkInfo != null){
+					netType = networkInfo.getType();
+					Log.d("Log", "connetion is available");
+				}else {
+					Log.d("Log", "connetion is  not available");
+				}
+			}
+			return netType;
+		}catch(Exception e){
+			Log.d("Log", "checkNetworkConnection" + e.toString());
+			return netType;
+		}
+	}
+	
 	@Override
 	protected void onNewIntent(Intent intent) {
 		Log.d(TAG, intent.toString());
@@ -252,6 +243,38 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			mWebView.loadUrl(webAddress); 
 		else
 			mWebView.loadUrl(getResources().getString(R.string.thesixtyone));
+		
+		// Gesture detection
+		mGestureDetector = new GestureDetector(new MyGestureDetector());
+		mGestureListener = new View.OnTouchListener() {
+			public boolean onTouch(View v, MotionEvent event) {
+				return mGestureDetector.onTouchEvent(event);
+			}
+		};
+
+		mWebView.setOnClickListener(this); 
+		mWebView.setOnTouchListener(mGestureListener);
+
+		mPhoneStateListener = new PhoneStateListener() {
+			@Override
+			public void onCallStateChanged(int state, String incomingNumber) {
+				if (state == TelephonyManager.CALL_STATE_RINGING) {
+					//Incoming call: Pause music
+					mWebView.loadUrl("javascript:t61.miniplayer.pause()");
+				} else if(state == TelephonyManager.CALL_STATE_IDLE) {
+					//Not in call: Play music
+					mWebView.loadUrl("javascript:t61.miniplayer.play()");
+				} else if(state == TelephonyManager.CALL_STATE_OFFHOOK) {
+					//A call is dialing, active or on hold
+					mWebView.loadUrl("javascript:t61.miniplayer.pause()");
+				}
+				super.onCallStateChanged(state, incomingNumber);
+			}
+		};
+		TelephonyManager mgr = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+		if(mgr != null) {
+			mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+		}
 	}
 	
 	class BroadcastsHandler extends BroadcastReceiver {
@@ -300,15 +323,16 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		if(mgr != null) {
 			mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
 		}
-		mWebView.getSettings().setPluginState(WebSettings.PluginState.OFF);
-		mWebView.destroy();
-		mWebView = null;
+		
+		if (mWebView != null) {
+			mWebView.getSettings().setPluginState(WebSettings.PluginState.OFF);
+			mWebView.destroy();
+			mWebView = null;
+		}
 
 		mNotificationManager.cancel(NOTIFICATION_ID);
 
 		unregisterReceiver(mBroadcastsHandler);
-		unregisterReceiver(mBatteryReceiver);
-		mBatteryDataDbAdapter.close();
 	}
 
 	@Override
