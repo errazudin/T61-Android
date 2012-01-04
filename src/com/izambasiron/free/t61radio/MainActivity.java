@@ -75,55 +75,12 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 
 		// Warn before using mobile data
 		int online = isOnline();
+		
 		final Context ctx = getApplicationContext();
-		if (T61RadioSharedPreferences.getShowAlertFlag(ctx) && T61RadioSharedPreferences.getAlertDataFlag(ctx)
+		if (T61RadioSharedPreferences.getShowAlertFlag(ctx) && 
+				T61RadioSharedPreferences.getAlertDataFlag(ctx)
 				&& online != -1 && online != ConnectivityManager.TYPE_WIFI) {
-			AlertDialog.Builder builder;
-			AlertDialog alertDialog;
-
-			LayoutInflater inflater = (LayoutInflater) this.getSystemService(LAYOUT_INFLATER_SERVICE);
-			View layout = inflater.inflate(R.layout.alert_dialog,
-			                               (ViewGroup) findViewById(R.id.layout_root));
-
-			TextView text = (TextView) layout.findViewById(R.id.text);
-			text.setText(getResources().getString(R.string.confirm_using_data));
-			
-			final CheckBox checkBox = (CheckBox) layout.findViewById(R.id.check_box);
-
-			builder = new AlertDialog.Builder(this);
-			builder.setView(layout)
-			       .setCancelable(false)
-			       .setPositiveButton(getResources().getString(R.string.ok), 
-			    		   new DialogInterface.OnClickListener() {
-					
-						@Override
-						public void onClick(DialogInterface dialog, int which) {
-							if (!checkBox.isChecked()) {
-								T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
-							}
-							dialog.cancel();
-							Intent intent = getIntent();
-							// check if this intent is started via url
-							if (Intent.ACTION_VIEW.equals(intent.getAction())) {
-								createWebView(intent.getData().toString());
-							} else {
-								createWebView(null);
-							}
-						}
-					})
-				   .setNegativeButton(getResources().getString(R.string.quit), 
-			    		   new DialogInterface.OnClickListener() {
-						
-						@Override
-						public void onClick(DialogInterface dialog, int which) {
-							if (!checkBox.isChecked()) {
-								T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
-							}
-							MainActivity.this.finish();
-						}
-					});
-			alertDialog = builder.create();
-			alertDialog.show();
+			displayDataAlertDialog();
 		} else {
 			Intent intent = getIntent();
 			// check if this intent is started via url
@@ -141,7 +98,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		// TODO: Show only on pause?
 		mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-		int icon = R.drawable.ic_action_play;
+		int icon = R.drawable.ic_stat_notify;
 		CharSequence tickerText = getResources().getString(R.string.app_name);
 		long when = System.currentTimeMillis();
 
@@ -160,6 +117,56 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		}
 	}
 	
+	private void displayDataAlertDialog() {
+		final Context ctx = getApplicationContext();
+		AlertDialog.Builder builder;
+		AlertDialog alertDialog;
+
+		LayoutInflater inflater = (LayoutInflater) this.getSystemService(LAYOUT_INFLATER_SERVICE);
+		View layout = inflater.inflate(R.layout.alert_dialog,
+		                               (ViewGroup) findViewById(R.id.layout_root));
+
+		TextView text = (TextView) layout.findViewById(R.id.text);
+		text.setText(getResources().getString(R.string.confirm_using_data));
+		
+		final CheckBox checkBox = (CheckBox) layout.findViewById(R.id.check_box);
+
+		builder = new AlertDialog.Builder(this);
+		builder.setView(layout)
+		       .setCancelable(false)
+		       .setPositiveButton(getResources().getString(R.string.ok), 
+		    		   new DialogInterface.OnClickListener() {
+				
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						if (!checkBox.isChecked()) {
+							T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
+						}
+						dialog.cancel();
+						Intent intent = getIntent();
+						// check if this intent is started via url
+						if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+							createWebView(intent.getData().toString());
+						} else {
+							createWebView(null);
+						}
+					}
+				})
+			   .setNegativeButton(getResources().getString(R.string.quit), 
+		    		   new DialogInterface.OnClickListener() {
+					
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						if (!checkBox.isChecked()) {
+							T61RadioSharedPreferences.setAlertDataFlag(ctx, false);
+						}
+						MainActivity.this.finish();
+					}
+				});
+		alertDialog = builder.create();
+		alertDialog.show();
+	}
+
 	public int isOnline() {
 		int netType = -1;
 		try{
@@ -188,8 +195,10 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		
 		// check if this intent is started via a link to http://www.thesixtyone.com
 		if (Intent.ACTION_VIEW.equals(intent.getAction())) {
-			mWebView.destroy();
-			mWebView = null;
+			if (mWebView != null) {
+				mWebView.destroy();
+				mWebView = null;
+			}
 			createWebView(intent.getData().toString());
 		} 
 	}
@@ -378,8 +387,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			break;
 
 		case R.id.menu_play:
-			mWebView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE));
-			mWebView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE));
+			mWebView.loadUrl("javascript:t61.shortcut.toggle_play()");
 			break;
 
 		case R.id.settings:
@@ -398,6 +406,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
+		Log.d(TAG, "KEYCODE: " + event.getKeyCode() );
 		if (event.getKeyCode() == KeyEvent.KEYCODE_POWER) {
 			WindowManager.LayoutParams lp = getWindow().getAttributes();
 			lp.screenBrightness = 0.01f;

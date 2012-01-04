@@ -5,7 +5,7 @@
     <PreferenceScreen
             android:title="@string/pref_header_battery_data_usage">
         <CheckBoxPreference
-                android:title="Test preference 2" 
+                android:title="Coming soon.." 
                 />
     </PreferenceScreen>
     <PreferenceScreen
