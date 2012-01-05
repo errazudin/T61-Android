@@ -42,7 +42,7 @@ import android.widget.TextView;
 
 import com.example.android.actionbarcompat.ActionBarActivity;
 
-public class MainActivity extends ActionBarActivity implements OnClickListener {
+public class MainActivity extends ActionBarActivity {
 	private static final String TAG = "MainActivity";
 	private static int SWIPE_MIN_DISTANCE;
 	private static int SWIPE_THRESHOLD_VELOCITY;
@@ -215,7 +215,6 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 
 		mNotification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
 		mNotificationManager.notify(NOTIFICATION_ID, mNotification);
-
 	}
 
 	private void createWebView(String webAddress) {
@@ -230,8 +229,8 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 			mWebView.getSettings().setPluginState(WebSettings.PluginState.ON);
 			mWebView.getSettings().setJavaScriptEnabled(true);
 			mWebView.getSettings().setSupportZoom(true);
-			// Disabled to let fling gesture work
-			//mWebView.getSettings().setBuiltInZoomControls(true);
+			// TODO: make this work with gesture
+			mWebView.getSettings().setBuiltInZoomControls(true);
 			mWebView.getSettings().setDefaultZoom(ZoomDensity.FAR);
 			mWebView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
 			mWebView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
@@ -253,16 +252,23 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		else
 			mWebView.loadUrl(getResources().getString(R.string.thesixtyone));
 		
-		// Gesture detection
-		mGestureDetector = new GestureDetector(new MyGestureDetector());
-		mGestureListener = new View.OnTouchListener() {
-			public boolean onTouch(View v, MotionEvent event) {
-				return mGestureDetector.onTouchEvent(event);
-			}
-		};
-
-		mWebView.setOnClickListener(this); 
-		mWebView.setOnTouchListener(mGestureListener);
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) { 
+			mWebView.requestFocus(View.FOCUS_DOWN);
+			mWebView.setOnTouchListener(new View.OnTouchListener() {
+		        @Override
+		        public boolean onTouch(View v, MotionEvent event) {
+		            switch (event.getAction()) {
+		                case MotionEvent.ACTION_DOWN:
+		                case MotionEvent.ACTION_UP:
+		                    if (!v.hasFocus()) {
+		                        v.requestFocus();
+		                    }
+		                    break;
+		            }
+		            return false;
+		        }
+		    });
+		}
 
 		mPhoneStateListener = new PhoneStateListener() {
 			@Override
@@ -284,6 +290,17 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		if(mgr != null) {
 			mgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 		}
+		
+		// Gesture detection
+		mGestureDetector = new GestureDetector(new MyGestureDetector());
+		mGestureListener = new View.OnTouchListener() {
+			public boolean onTouch(View v, MotionEvent event) {
+				return mGestureDetector.onTouchEvent(event);
+			}
+		};
+		
+		// add fling gesture, but only works on the actionbar
+		getWindow().getDecorView().setOnTouchListener(mGestureListener);
 	}
 	
 	class BroadcastsHandler extends BroadcastReceiver {
@@ -485,7 +502,7 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 	    }
 	}
 
-	@Override
-	public void onClick(View v) {
-	}
+//	@Override
+//	public void onClick(View v) {
+//	}
 }
