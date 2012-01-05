@@ -10,6 +10,14 @@
         <PreferenceCategory 
             android:title="Dialogs">
             <CheckBoxPreference
+                android:key="@string/pref_key_alert_data"
+                android:title="@string/pref_title_alert_data"
+                android:summaryOn="@string/pref_summary_on_alert_data"
+                android:summaryOff="@string/pref_summary_off_alert_data"
+                android:dependency="@string/pref_key_show_alert"
+                android:defaultValue="true"
+                />
+            <CheckBoxPreference
                 android:key="@string/pref_key_alert_exit"
                 android:title="@string/pref_title_alert_exit"
                 android:summaryOn="@string/pref_summary_on_alert_exit"
